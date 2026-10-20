@@ -1,0 +1,47 @@
+[package]
+name = "sddp"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Joseph Telaak"]
+description = "Simple Device Discovery Protocol (SDDP): parse and format messages, discover devices, watch announcements and announce a device over UDP multicast"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/The1TrueJoe/sddp"
+documentation = "https://docs.rs/sddp"
+readme = "README.md"
+keywords = ["sddp", "discovery", "multicast", "udp", "network"]
+categories = ["network-programming"]
+exclude = [".github/"]
+
+[features]
+default = ["tokio"]
+# Async discovery, listening and announcing. Without it the crate is just the
+# message parser/formatter and has no networking dependencies.
+tokio = ["dep:tokio", "dep:socket2"]
+
+[dependencies]
+thiserror = "2"
+socket2 = { version = "0.6", features = ["all"], optional = true }
+tokio = { version = "1.38", default-features = false, features = ["net", "time", "rt", "sync", "macros"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread", "signal", "time"] }
+
+[[example]]
+name = "discover"
+required-features = ["tokio"]
+
+[[example]]
+name = "watch"
+required-features = ["tokio"]
+
+[[example]]
+name = "announce"
+required-features = ["tokio"]
+
+[[test]]
+name = "loopback"
+required-features = ["tokio"]
+
+[package.metadata.docs.rs]
+all-features = true
