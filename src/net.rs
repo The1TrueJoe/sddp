@@ -65,16 +65,13 @@ fn into_tokio(sock: socket2::Socket) -> io::Result<tokio::net::UdpSocket> {
     tokio::net::UdpSocket::from_std(sock.into())
 }
 
-/// A socket bound to `0.0.0.0:1902` that has joined the SDDP group on
-/// `interface` and multicasts out of it. Shares the port with other programs.
-pub(crate) fn multicast_socket(interface: Ipv4Addr) -> io::Result<tokio::net::UdpSocket> {
-    let doing = || format!("opening the SDDP socket on UDP port {PORT} (interface {interface})");
-    let sock = udp_socket().map_err(|e| context(e, doing()))?;
-    sock.set_reuse_address(true)
-        .map_err(|e| context(e, doing()))?;
-    // Mirrors socket2's own cfg for `set_reuse_port`. Older compilers (the
-    // MSRV) don't know every one of these target names, hence the allow.
-    #[allow(unexpected_cfgs)]
+/// Lets other sockets bind the same port. `SO_REUSEADDR` is enough on
+/// Windows; Unix also needs `SO_REUSEPORT` (where socket2 supports it).
+// The cfg mirrors socket2's own for `set_reuse_port`. Older compilers (the
+// MSRV) don't know every one of these target names, hence the allow.
+#[allow(unexpected_cfgs)]
+fn share_port(sock: &socket2::Socket) -> io::Result<()> {
+    sock.set_reuse_address(true)?;
     #[cfg(all(
         unix,
         not(any(
@@ -84,7 +81,16 @@ pub(crate) fn multicast_socket(interface: Ipv4Addr) -> io::Result<tokio::net::Ud
             target_os = "nuttx"
         ))
     ))]
-    sock.set_reuse_port(true).map_err(|e| context(e, doing()))?;
+    sock.set_reuse_port(true)?;
+    Ok(())
+}
+
+/// A socket bound to `0.0.0.0:1902` that has joined the SDDP group on
+/// `interface` and multicasts out of it. Shares the port with other programs.
+pub(crate) fn multicast_socket(interface: Ipv4Addr) -> io::Result<tokio::net::UdpSocket> {
+    let doing = || format!("opening the SDDP socket on UDP port {PORT} (interface {interface})");
+    let sock = udp_socket().map_err(|e| context(e, doing()))?;
+    share_port(&sock).map_err(|e| context(e, doing()))?;
     // Bind the wildcard address, not the interface address: on Linux a socket
     // bound to a unicast address never receives multicast.
     let bind = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, PORT);
