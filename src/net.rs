@@ -72,6 +72,9 @@ pub(crate) fn multicast_socket(interface: Ipv4Addr) -> io::Result<tokio::net::Ud
     let sock = udp_socket().map_err(|e| context(e, doing()))?;
     sock.set_reuse_address(true)
         .map_err(|e| context(e, doing()))?;
+    // Mirrors socket2's own cfg for `set_reuse_port`. Older compilers (the
+    // MSRV) don't know every one of these target names, hence the allow.
+    #[allow(unexpected_cfgs)]
     #[cfg(all(
         unix,
         not(any(
